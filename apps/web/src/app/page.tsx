@@ -128,7 +128,8 @@ export default function Home() {
 
   const loadOverviewWeather = useCallback(
     async (cities: FavoriteCity[], force = false) => {
-      if (!force && isWeatherFresh() && Object.keys(pageCache.weather).length) {
+      const cacheCoversAll = cities.every((c) => pageCache.weather[c.id]);
+      if (!force && isWeatherFresh() && cacheCoversAll) {
         return;
       }
       setLoadingOverview(true);
@@ -254,7 +255,8 @@ export default function Home() {
         void loadFavoriteCities();
       } else {
         setFavoriteCities([]);
-        void loadOverviewWeather(demoCities);
+        setWeatherByCity({});
+        void loadOverviewWeather(demoCities, true);
       }
     });
 
