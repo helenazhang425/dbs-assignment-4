@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase/client";
+import { usePreferences } from "@/lib/use-preferences";
 
 type AppNavProps = {
   session: Session | null;
@@ -21,6 +22,8 @@ export function AppNav({ session }: AppNavProps) {
   const [loadingAuth, setLoadingAuth] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authNotice, setAuthNotice] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [prefs, updatePrefs] = usePreferences();
 
   function openAuth(next: AuthMode) {
     setMode(next);
@@ -101,6 +104,90 @@ export function AppNav({ session }: AppNavProps) {
             My cities
           </NavLink>
         </nav>
+
+        <div className="relative">
+          <button
+            aria-label="Settings"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-[#ebe3d7] bg-[#ffffff] text-lg text-[#55504a] hover:bg-[#f5efe6]"
+            onClick={() => setSettingsOpen((v) => !v)}
+            type="button"
+          >
+            ⚙
+          </button>
+          {settingsOpen ? (
+            <div className="absolute right-0 top-full z-30 mt-2 w-72 rounded-[1.2rem] border border-[#ebe3d7] bg-[#ffffff] p-5 shadow-[0_16px_40px_rgba(58,53,48,0.14)]">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-[10px] uppercase tracking-[0.3em] text-[#e89e7a]">
+                  Settings
+                </div>
+                <button
+                  aria-label="Close"
+                  className="text-sm text-[#8a847d] hover:text-[#3a3530]"
+                  onClick={() => setSettingsOpen(false)}
+                  type="button"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="mt-4">
+                <div className="text-[11px] uppercase tracking-wider text-[#8a847d]">
+                  Temperature
+                </div>
+                <div className="mt-2 inline-flex rounded-full border border-[#ebe3d7] bg-[#faf6f0] p-1 text-xs">
+                  {(["C", "F"] as const).map((unit) => (
+                    <button
+                      key={unit}
+                      className={`rounded-full px-3 py-1 ${
+                        prefs.tempUnit === unit
+                          ? "bg-[#4a6382] text-[#faf6f0]"
+                          : "text-[#55504a]"
+                      }`}
+                      onClick={() =>
+                        updatePrefs((current) => ({ ...current, tempUnit: unit }))
+                      }
+                      type="button"
+                    >
+                      °{unit}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <div className="text-[11px] uppercase tracking-wider text-[#8a847d]">
+                  Run window
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                  <HourSelect
+                    value={prefs.runStartHour}
+                    onChange={(hour) =>
+                      updatePrefs((current) => ({
+                        ...current,
+                        runStartHour: hour,
+                        runEndHour: Math.max(current.runEndHour, hour + 1),
+                      }))
+                    }
+                  />
+                  <span className="text-xs text-[#8a847d]">to</span>
+                  <HourSelect
+                    value={prefs.runEndHour}
+                    onChange={(hour) =>
+                      updatePrefs((current) => ({
+                        ...current,
+                        runEndHour: hour,
+                        runStartHour: Math.min(current.runStartHour, hour - 1),
+                      }))
+                    }
+                  />
+                </div>
+                <p className="mt-2 text-[11px] text-[#8a847d]">
+                  Best-window picks stay within this range.
+                </p>
+              </div>
+            </div>
+          ) : null}
+        </div>
 
         <div className="relative flex items-center gap-2 text-sm">
           {session ? (
@@ -231,6 +318,34 @@ export function AppNav({ session }: AppNavProps) {
       </div>
     </header>
   );
+}
+
+function HourSelect({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (hour: number) => void;
+}) {
+  return (
+    <select
+      className="h-9 rounded-lg border border-[#d9cfc0] bg-[#faf6f0] px-2 text-sm text-[#3a3530] outline-none focus:border-[#4a6382]"
+      onChange={(event) => onChange(Number(event.target.value))}
+      value={value}
+    >
+      {Array.from({ length: 24 }, (_, hour) => (
+        <option key={hour} value={hour}>
+          {formatHour(hour)}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function formatHour(hour: number) {
+  const period = hour < 12 ? "AM" : "PM";
+  const hr12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${hr12} ${period}`;
 }
 
 function NavLink({
