@@ -80,11 +80,14 @@ export function computeRunScore(input: {
   );
 }
 
-export function formatRunTime(value: string | null, timezone: string) {
+export function formatRunTime(value: string | null, _timezone: string) {
   if (!value) return "No clear window";
 
+  // Open-Meteo returns times already in the city's local zone without a tz
+  // suffix, which JS parses as the browser's local time. `getHours()` on that
+  // Date preserves the hour component from the string, so reading local parts
+  // here correctly shows the city-local hour regardless of where the viewer is.
   return new Date(value).toLocaleTimeString("en-US", {
-    timeZone: timezone,
     hour: "numeric",
     minute: "2-digit",
   });

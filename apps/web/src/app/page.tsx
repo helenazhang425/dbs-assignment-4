@@ -160,49 +160,12 @@ export default function Home() {
         setWeatherByCity({});
         return;
       }
-
-      setLoadingOverview(true);
-
-      const cityIds = cities.map((city) => city.id);
-      const result = await supabase
-        .from("weather_updates")
-        .select(
-          "city_id, source_timestamp, temperature_c, apparent_temperature_c, wind_speed_kph, weather_code, best_run_time, best_run_score, precipitation_probability",
-        )
-        .in("city_id", cityIds)
-        .order("source_timestamp", { ascending: false });
-
-      if (result.error) {
-        setError(result.error.message);
-        setLoadingOverview(false);
-        return;
-      }
-
-      const latestByCity: Record<string, CityWeather> = {};
-      for (const row of result.data as WeatherUpdateRow[]) {
-        if (!latestByCity[row.city_id]) {
-          latestByCity[row.city_id] = mapWeatherRow(row);
-        }
-      }
-
-      const missing = cities.filter((city) => !latestByCity[city.id]);
-      if (missing.length > 0) {
-        try {
-          const fallback = await fetchWeatherForCities(missing, {
-            startHour: prefs.runStartHour,
-            endHour: prefs.runEndHour,
-          });
-          Object.assign(latestByCity, fallback);
-        } catch {
-          // partial data is fine
-        }
-      }
-
-      setWeatherByCity(latestByCity);
-      pageCache.weatherFetchedAt = Date.now();
-      setLoadingOverview(false);
+      // Frontend is the source of truth for best-run time so it respects the
+      // user's run window preference; Supabase realtime still streams live
+      // updates to current temp / weather_code.
+      await loadOverviewWeather(cities, true);
     },
-    [mapWeatherRow, prefs.runStartHour, prefs.runEndHour],
+    [loadOverviewWeather],
   );
 
   const loadFavoriteCities = useCallback(async () => {
@@ -290,10 +253,21 @@ export default function Home() {
             return;
           }
 
-          setWeatherByCity((current) => ({
-            ...current,
-            [row.city_id as string]: mapWeatherRow(row as WeatherUpdateRow),
-          }));
+          setWeatherByCity((current) => {
+            const incoming = mapWeatherRow(row as WeatherUpdateRow);
+            const existing = current[row.city_id as string];
+            return {
+              ...current,
+              [row.city_id as string]: existing
+                ? {
+                    ...incoming,
+                    bestRunTime: existing.bestRunTime,
+                    bestRunScore: existing.bestRunScore,
+                    precipitationProbability: existing.precipitationProbability,
+                  }
+                : incoming,
+            };
+          });
         },
       )
       .subscribe();
@@ -591,8 +565,10 @@ function PodiumCard({
           </div>
         </div>
         <div className="text-right">
-          <div className="text-[10px] uppercase leading-none tracking-[0.22em] opacity-80">
-            Best window
+          <div className="text-[10px] uppercase leading-tight tracking-[0.22em] opacity-80">
+            Best
+            <br />
+            window
           </div>
           <div className="mt-2 font-mono text-sm">
             {weather?.bestRunTime
