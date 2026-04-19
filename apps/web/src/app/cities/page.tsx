@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { AppNav } from "@/components/app-nav";
 import { supabase } from "@/lib/supabase/client";
+import { pageCache } from "@/lib/page-cache";
 import {
   cityLabel,
   isFavoriteCity,
@@ -11,15 +12,33 @@ import {
   type FavoriteCity,
 } from "@/lib/time-to-run";
 
+function countryFlag(code?: string | null) {
+  if (!code || code.length !== 2) return "🌍";
+  const chars = [...code.toUpperCase()];
+  if (!chars.every((c) => c >= "A" && c <= "Z")) return "🌍";
+  return String.fromCodePoint(
+    ...chars.map((c) => 0x1f1e6 + c.charCodeAt(0) - 0x41),
+  );
+}
+
 export default function CitiesPage() {
-  const [session, setSession] = useState<Session | null>(null);
-  const [favoriteCities, setFavoriteCities] = useState<FavoriteCity[]>([]);
+  const [session, setSession] = useState<Session | null>(pageCache.session);
+  const [favoriteCities, setFavoriteCities] = useState<FavoriteCity[]>(
+    pageCache.favorites,
+  );
   const [cityQuery, setCityQuery] = useState("");
   const [cityResults, setCityResults] = useState<CitySearchResult[]>([]);
   const [searchingCities, setSearchingCities] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingCityKey, setPendingCityKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    pageCache.session = session;
+  }, [session]);
+  useEffect(() => {
+    pageCache.favorites = favoriteCities;
+  }, [favoriteCities]);
 
   const loadFavoriteCities = useCallback(async () => {
     const result = await supabase
@@ -61,7 +80,6 @@ export default function CitiesPage() {
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
       setError(null);
-      setMessage(nextSession ? "Welcome back." : null);
 
       if (nextSession) {
         void loadFavoriteCities();
@@ -224,40 +242,6 @@ export default function CitiesPage() {
             Search any city, star your favorites, and we&apos;ll watch the
             forecast for the best run window in each one.
           </p>
-
-          {/* search bar — prominent hero element */}
-          {session ? (
-            <div className="mt-8">
-              <label
-                className="block text-[10px] uppercase tracking-[0.3em] text-[#faf6f0]/75"
-                htmlFor="city-search"
-              >
-                Search cities
-              </label>
-              <div className="mt-2 flex items-center gap-3 rounded-2xl border border-[#faf6f0]/30 bg-[#3a3530]/30 px-4 py-3 backdrop-blur-sm focus-within:border-[#e8b96e]">
-                <span aria-hidden className="text-xl">
-                  🔍
-                </span>
-                <input
-                  id="city-search"
-                  className="h-10 w-full bg-transparent text-lg text-[#faf6f0] placeholder:text-[#faf6f0]/50 outline-none"
-                  onChange={(event) => {
-                    setCityQuery(event.target.value);
-                    if (event.target.value.trim().length < 2) {
-                      setCityResults([]);
-                      setSearchingCities(false);
-                    }
-                  }}
-                  placeholder="Chicago, Tokyo, Reykjavik, São Paulo…"
-                  type="text"
-                  value={cityQuery}
-                />
-                {searchingCities ? (
-                  <span className="text-xs text-[#e8b96e]">searching…</span>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
         </div>
         <div
           aria-hidden
@@ -340,7 +324,7 @@ export default function CitiesPage() {
             )}
           </div>
 
-          {/* ── SEARCH RESULTS ──────────────────────────────────────── */}
+          {/* ── SEARCH BAR + RESULTS ────────────────────────────────── */}
           <div>
             <div className="flex items-end justify-between gap-4 border-b-2 border-dashed border-[#e89e7a]/40 pb-3">
               <div>
@@ -348,7 +332,7 @@ export default function CitiesPage() {
                   City search
                 </p>
                 <h2 className="mt-1 font-serif text-3xl text-[#4a6382]">
-                  Search results
+                  Add a city
                 </h2>
               </div>
               {cityResults.length > 0 ? (
@@ -356,6 +340,29 @@ export default function CitiesPage() {
                   {cityResults.length} match
                   {cityResults.length === 1 ? "" : "es"}
                 </span>
+              ) : null}
+            </div>
+
+            <div className="mt-5 flex items-center gap-3 rounded-2xl border border-[#ebe3d7] bg-[#ffffff] px-4 py-3 focus-within:border-[#4a6382]">
+              <span aria-hidden className="text-xl text-[#8a847d]">
+                🔍
+              </span>
+              <input
+                id="city-search"
+                className="h-10 w-full bg-transparent text-lg text-[#3a3530] placeholder:text-[#8a847d] outline-none"
+                onChange={(event) => {
+                  setCityQuery(event.target.value);
+                  if (event.target.value.trim().length < 2) {
+                    setCityResults([]);
+                    setSearchingCities(false);
+                  }
+                }}
+                placeholder="Chicago, Tokyo, Reykjavik, São Paulo…"
+                type="text"
+                value={cityQuery}
+              />
+              {searchingCities ? (
+                <span className="text-xs text-[#b86b3c]">searching…</span>
               ) : null}
             </div>
 
@@ -380,14 +387,14 @@ export default function CitiesPage() {
                       }`}
                     >
                       <div
-                        className={`flex h-12 w-12 items-center justify-center rounded-xl text-xl ${
+                        className={`flex h-12 w-12 items-center justify-center rounded-xl text-2xl ${
                           favorite
                             ? "bg-[#4a6382] text-[#e8b96e]"
-                            : "bg-[#ebe3d7] text-[#3a3530]"
+                            : "bg-[#ebe3d7]"
                         }`}
                         aria-hidden
                       >
-                        {favorite ? "⭐" : "📍"}
+                        {favorite ? "⭐" : countryFlag(city.country_code)}
                       </div>
 
                       <div>
