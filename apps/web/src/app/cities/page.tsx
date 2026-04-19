@@ -17,7 +17,6 @@ export default function CitiesPage() {
   const [cityQuery, setCityQuery] = useState("");
   const [cityResults, setCityResults] = useState<CitySearchResult[]>([]);
   const [searchingCities, setSearchingCities] = useState(false);
-  const [loadingAuth, setLoadingAuth] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingCityKey, setPendingCityKey] = useState<string | null>(null);
@@ -164,159 +163,266 @@ export default function CitiesPage() {
     await loadFavoriteCities();
   }
 
-  async function handleSignOut() {
-    setLoadingAuth(true);
+  async function handleRemoveFavorite(favorite: FavoriteCity) {
+    const key = `fav-${favorite.id}`;
+    setPendingCityKey(key);
     setError(null);
     setMessage(null);
 
-    const result = await supabase.auth.signOut();
+    const result = await supabase
+      .from("favorite_cities")
+      .delete()
+      .eq("id", favorite.id);
 
-    setLoadingAuth(false);
+    setPendingCityKey(null);
 
     if (result.error) {
       setError(result.error.message);
+      return;
     }
+
+    setMessage(`Removed ${favorite.city_name}.`);
+    await loadFavoriteCities();
   }
 
   const favoriteCount = favoriteCities.length;
 
   const emptySearchHint = useMemo(() => {
     if (cityQuery.trim().length < 2) {
-      return "Search for a city to start building your favorites.";
+      return "Type at least two characters to search.";
     }
 
     if (searchingCities) {
-      return "Searching...";
+      return "Searching…";
     }
 
-    return "No matching cities found yet.";
+    return "No matching cities.";
   }, [cityQuery, searchingCities]);
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#f2f8ff_0%,#ffffff_100%)] text-[#17324c]">
-      <AppNav
-        loadingAuth={loadingAuth}
-        onSignOut={() => {
-          void handleSignOut();
-        }}
-        session={session}
-      />
+    <main className="min-h-screen text-[#3a3530]">
+      <AppNav session={session} />
 
-      <div className="mx-auto max-w-7xl px-6 py-8">
+      {/* ── HERO: sunrise gradient with prominent search ────────────── */}
+      <section className="relative overflow-hidden border-b border-[#ebe3d7] bg-[linear-gradient(135deg,#5d7896_0%,#d18b68_60%,#e89e7a_100%)] text-[#faf6f0]">
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-20"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(55deg, transparent 0 18px, rgba(250,246,240,0.18) 18px 20px)",
+          }}
+        />
+        <div className="relative mx-auto flex min-h-[420px] max-w-6xl flex-col justify-end px-6 py-14">
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-[#faf6f0]/80">
+            <span aria-hidden>🌍</span> Cities
+          </div>
+          <h1 className="mt-3 font-serif text-5xl leading-[1.05] tracking-tight text-balance md:text-6xl">
+            Pick the cities you want to run.
+          </h1>
+          <p className="mt-4 max-w-2xl text-base leading-7 text-[#faf6f0]/85 md:text-lg md:leading-8">
+            Search any city, star your favorites, and we&apos;ll watch the
+            forecast for the best run window in each one.
+          </p>
+
+          {/* search bar — prominent hero element */}
+          {session ? (
+            <div className="mt-8">
+              <label
+                className="block text-[10px] uppercase tracking-[0.3em] text-[#faf6f0]/75"
+                htmlFor="city-search"
+              >
+                Search cities
+              </label>
+              <div className="mt-2 flex items-center gap-3 rounded-2xl border border-[#faf6f0]/30 bg-[#3a3530]/30 px-4 py-3 backdrop-blur-sm focus-within:border-[#e8b96e]">
+                <span aria-hidden className="text-xl">
+                  🔍
+                </span>
+                <input
+                  id="city-search"
+                  className="h-10 w-full bg-transparent text-lg text-[#faf6f0] placeholder:text-[#faf6f0]/50 outline-none"
+                  onChange={(event) => {
+                    setCityQuery(event.target.value);
+                    if (event.target.value.trim().length < 2) {
+                      setCityResults([]);
+                      setSearchingCities(false);
+                    }
+                  }}
+                  placeholder="Chicago, Tokyo, Reykjavik, São Paulo…"
+                  type="text"
+                  value={cityQuery}
+                />
+                {searchingCities ? (
+                  <span className="text-xs text-[#e8b96e]">searching…</span>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </div>
+        <div
+          aria-hidden
+          className="h-[3px] w-full"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(90deg,#e8b96e 0 18px,transparent 18px 30px)",
+          }}
+        />
+      </section>
+
+      {/* ── FLASH MESSAGES ──────────────────────────────────────────── */}
+      <div className="mx-auto max-w-6xl px-6">
         {message ? (
-          <div className="mb-5 rounded-2xl border border-[#bad7f4] bg-[#edf6ff] px-4 py-3 text-sm text-[#215b8b]">
-            {message}
+          <div className="mt-5 flex items-center gap-3 rounded-full border border-[#b8c9d9] bg-[#e6edf5] px-5 py-2 text-sm text-[#4a6382]">
+            <span aria-hidden>☀</span> {message}
           </div>
         ) : null}
-
         {error ? (
-          <div className="mb-5 rounded-2xl border border-[#f0bcc1] bg-[#fff4f4] px-4 py-3 text-sm text-[#a12a34]">
-            {error}
+          <div className="mt-5 flex items-center gap-3 rounded-full border border-[#e89e7a] bg-[#f5e4de] px-5 py-2 text-sm text-[#8a4a3a]">
+            <span aria-hidden>⚠</span> {error}
           </div>
         ) : null}
+      </div>
 
-        {!session ? (
-          <div className="rounded-[2rem] border border-[#d7e2ee] bg-white/90 px-6 py-12 text-center shadow-[0_20px_50px_rgba(30,67,107,0.08)]">
-            <h1 className="font-serif text-4xl">Sign in to manage your cities.</h1>
-            <p className="mx-auto mt-4 max-w-xl text-base leading-8 text-[#4a657f]">
-              Once you sign in, you can search for cities worldwide and toggle
-              favorites on or off with a single tap.
+      {!session ? (
+        <section className="mx-auto max-w-3xl px-6 py-16">
+          <div className="rounded-[1.6rem] border-2 border-dashed border-[#b8c9d9] bg-[#ffffff] p-10 text-center">
+            <div className="text-4xl">👟</div>
+            <h2 className="mt-4 font-serif text-3xl text-[#4a6382]">
+              Sign in to start tracking cities
+            </h2>
+            <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[#55504a]">
+              Your cities are tied to your account. Sign in from the top right
+              and come back here to star the cities you run.
             </p>
           </div>
-        ) : (
-          <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-            <div className="rounded-[2rem] border border-[#d7e2ee] bg-white/90 p-7 shadow-[0_20px_50px_rgba(30,67,107,0.08)]">
-              <p className="text-sm uppercase tracking-[0.18em] text-[#6e879f]">
-                My Cities
-              </p>
-              <h1 className="mt-4 font-serif text-5xl leading-[1.02] tracking-tight">
-                Pick at least 1 city to follow.
-              </h1>
-              <p className="mt-5 max-w-2xl text-lg leading-8 text-[#4a657f]">
-                Gold stars mark the cities in your favorites list. Toggle any
-                city on or off and your home page will update around those
-                selections.
-              </p>
-
-              <div className="mt-7 grid gap-4 sm:grid-cols-2">
-                <div className="rounded-2xl border border-[#dbe6f1] bg-[#f8fbff] px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.14em] text-[#7891a7]">
-                    Favorites
-                  </div>
-                  <div className="mt-2 font-serif text-3xl">{favoriteCount}</div>
-                </div>
-                <div className="rounded-2xl border border-[#dbe6f1] bg-[#f8fbff] px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.14em] text-[#7891a7]">
-                    Personalized feed
-                  </div>
-                  <div className="mt-2 text-lg font-medium">
-                    {favoriteCount > 0 ? "Ready" : "Needs cities"}
-                  </div>
-                </div>
+        </section>
+      ) : (
+        <section className="mx-auto max-w-6xl px-6 py-10">
+          {/* ── YOUR CITIES: horizontal chip strip ──────────────────── */}
+          <div className="mb-10">
+            <div className="flex items-end justify-between gap-4 border-b-2 border-dashed border-[#e89e7a]/40 pb-3">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.3em] text-[#8a847d]">
+                  Your cities
+                </p>
+                <h2 className="mt-1 font-serif text-3xl text-[#4a6382]">
+                  {favoriteCount === 0
+                    ? "No cities yet — add your first one below"
+                    : `${favoriteCount} ${favoriteCount === 1 ? "city" : "cities"} tracked`}
+                </h2>
               </div>
             </div>
 
-            <div className="rounded-[2rem] border border-[#d7e2ee] bg-white/90 p-7 shadow-[0_20px_50px_rgba(30,67,107,0.08)]">
-              <label className="block text-sm text-[#4a657f]">
-                Search by city name
-              </label>
-              <input
-                className="mt-2 h-12 w-full rounded-xl border border-[#cad7e4] px-4 text-sm outline-none"
-                onChange={(event) => {
-                  setCityQuery(event.target.value);
-                  if (event.target.value.trim().length < 2) {
-                    setCityResults([]);
-                    setSearchingCities(false);
-                  }
-                }}
-                placeholder="Chicago, Tokyo, Paris, São Paulo..."
-                type="text"
-                value={cityQuery}
-              />
+            {favoriteCount > 0 ? (
+              <div className="mt-5 flex flex-wrap gap-2">
+                {favoriteCities.map((fav) => (
+                  <button
+                    key={fav.id}
+                    onClick={() => {
+                      void handleRemoveFavorite(fav);
+                    }}
+                    type="button"
+                    className="group inline-flex items-center gap-2 rounded-full border border-[#4a6382] bg-[#4a6382] px-4 py-1.5 text-sm text-[#faf6f0] hover:border-[#e89e7a] hover:bg-[#e89e7a]"
+                    title={`Remove ${fav.city_name}`}
+                  >
+                    <span aria-hidden>⭐</span>
+                    <span className="font-medium">{fav.city_name}</span>
+                    <span className="text-[#e8b96e] group-hover:text-[#faf6f0]">
+                      {pendingCityKey === `fav-${fav.id}` ? "…" : "×"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-5 rounded-2xl border-2 border-dashed border-[#d9cfc0] bg-[#ffffff] px-6 py-8 text-center text-sm text-[#8a847d]">
+                Search a city below and star it to add it to your list.
+              </div>
+            )}
+          </div>
 
-              <div className="mt-5 space-y-3">
-                {cityResults.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-[#d5e1ed] bg-[#fbfdff] px-4 py-6 text-sm text-[#688098]">
-                    {emptySearchHint}
-                  </div>
-                ) : (
-                  cityResults.map((city) => {
-                    const favorite = isFavoriteCity(city, favoriteCities);
-                    const key = `${city.name}-${city.latitude}-${city.longitude}`;
+          {/* ── SEARCH RESULTS ──────────────────────────────────────── */}
+          <div>
+            <div className="flex items-end justify-between gap-4 border-b-2 border-dashed border-[#e89e7a]/40 pb-3">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.3em] text-[#8a847d]">
+                  City search
+                </p>
+                <h2 className="mt-1 font-serif text-3xl text-[#4a6382]">
+                  Search results
+                </h2>
+              </div>
+              {cityResults.length > 0 ? (
+                <span className="text-xs text-[#8a847d]">
+                  {cityResults.length} match
+                  {cityResults.length === 1 ? "" : "es"}
+                </span>
+              ) : null}
+            </div>
 
-                    return (
+            <div className="mt-5 space-y-3">
+              {cityResults.length === 0 ? (
+                <div className="rounded-2xl border-2 border-dashed border-[#d9cfc0] bg-[#ffffff] px-6 py-10 text-center text-sm text-[#8a847d]">
+                  {emptySearchHint}
+                </div>
+              ) : (
+                cityResults.map((city) => {
+                  const favorite = isFavoriteCity(city, favoriteCities);
+                  const key = `${city.name}-${city.latitude}-${city.longitude}`;
+                  const pending = pendingCityKey === key;
+
+                  return (
+                    <article
+                      key={key}
+                      className={`grid grid-cols-[auto_1fr_auto] items-center gap-4 rounded-[1.3rem] border px-5 py-4 transition ${
+                        favorite
+                          ? "border-[#4a6382] bg-[#e6edf5]"
+                          : "border-[#ebe3d7] bg-[#ffffff] hover:border-[#b8c9d9] hover:bg-[#f5efe6]"
+                      }`}
+                    >
+                      <div
+                        className={`flex h-12 w-12 items-center justify-center rounded-xl text-xl ${
+                          favorite
+                            ? "bg-[#4a6382] text-[#e8b96e]"
+                            : "bg-[#ebe3d7] text-[#3a3530]"
+                        }`}
+                        aria-hidden
+                      >
+                        {favorite ? "⭐" : "📍"}
+                      </div>
+
+                      <div>
+                        <div className="font-serif text-xl text-[#4a6382]">
+                          {cityLabel(city)}
+                        </div>
+                        <div className="mt-0.5 flex gap-3 font-mono text-[11px] text-[#8a847d]">
+                          <span>{city.latitude.toFixed(2)}°</span>
+                          <span>{city.longitude.toFixed(2)}°</span>
+                          <span>{city.timezone}</span>
+                        </div>
+                      </div>
+
                       <button
-                        key={key}
-                        className="flex w-full items-center justify-between gap-4 rounded-2xl border border-[#dbe6f1] bg-[#fbfdff] px-4 py-4 text-left hover:bg-[#f7fbff]"
+                        className={`rounded-full px-4 py-2 text-xs font-medium uppercase tracking-wider transition ${
+                          favorite
+                            ? "bg-[#e89e7a] text-[#ffffff] hover:bg-[#d18b68]"
+                            : "bg-[#4a6382] text-[#faf6f0] hover:bg-[#5d7896]"
+                        }`}
                         onClick={() => {
                           void handleToggleFavorite(city);
                         }}
                         type="button"
+                        disabled={pending}
                       >
-                        <div>
-                          <div className="font-medium text-[#17324c]">
-                            {cityLabel(city)}
-                          </div>
-                          <div className="mt-1 text-sm text-[#688098]">
-                            {city.timezone}
-                          </div>
-                        </div>
-                        <div className="text-2xl">
-                          {pendingCityKey === key
-                            ? "…"
-                            : favorite
-                              ? "★"
-                              : "☆"}
-                        </div>
+                        {pending ? "…" : favorite ? "Remove" : "Add"}
                       </button>
-                    );
-                  })
-                )}
-              </div>
+                    </article>
+                  );
+                })
+              )}
             </div>
-          </section>
-        )}
-      </div>
+          </div>
+        </section>
+      )}
     </main>
   );
 }
