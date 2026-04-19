@@ -1,0 +1,16 @@
+# Node
+**/node_modules/
+
+# Env files (apps keep their own .env.example)
+.env
+.env.local
+.env.*.local
+
+# Claude local config
+.claude/
+
+# Supabase local scratch
+supabase/.temp/
+
+# OS
+.DS_Store
