@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "poll:weather": "node --env-file=.env ./src/poll-weather.mjs"
+    "poll:weather": "node ./src/poll-weather.mjs",
+    "poll:weather:local": "node --env-file=.env ./src/poll-weather.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.3"
