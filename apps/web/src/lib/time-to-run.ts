@@ -13,6 +13,7 @@ export type CitySearchResult = {
   id: number;
   name: string;
   country?: string;
+  country_code?: string;
   admin1?: string;
   latitude: number;
   longitude: number;
@@ -101,7 +102,12 @@ export function isFavoriteCity(
   );
 }
 
-export async function fetchWeatherForCities(cities: FavoriteCity[]) {
+export async function fetchWeatherForCities(
+  cities: FavoriteCity[],
+  options: { startHour?: number; endHour?: number } = {},
+) {
+  const startHour = options.startHour ?? 6;
+  const endHour = options.endHour ?? 20;
   const updates = await Promise.all(
     cities.map(async (city) => {
       const response = await fetch(
@@ -142,6 +148,9 @@ export async function fetchWeatherForCities(cities: FavoriteCity[]) {
         const candidateTime = data.hourly.time[index];
         const hour = new Date(candidateTime).getHours();
         if (hour < currentHour && index < 2) {
+          continue;
+        }
+        if (hour < startHour || hour > endHour) {
           continue;
         }
 

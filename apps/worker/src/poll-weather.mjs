@@ -58,6 +58,9 @@ async function fetchForecast(city) {
     if (hour < currentHour && index < 2) {
       continue;
     }
+    if (hour < 6 || hour > 20) {
+      continue;
+    }
 
     const score = computeRunScore({
       temperatureC: data.hourly.temperature_2m[index],
