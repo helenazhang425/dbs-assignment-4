@@ -106,15 +106,17 @@ export function AppNav({ session }: AppNavProps) {
         </nav>
 
         <div className="relative">
-          <button
-            aria-label="Settings"
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-[#ebe3d7] bg-[#ffffff] text-lg text-[#55504a] hover:bg-[#f5efe6]"
-            onClick={() => setSettingsOpen((v) => !v)}
-            type="button"
-          >
-            ⚙
-          </button>
-          {settingsOpen ? (
+          {session ? (
+            <button
+              aria-label="Settings"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-[#ebe3d7] bg-[#ffffff] text-lg text-[#55504a] hover:bg-[#f5efe6]"
+              onClick={() => setSettingsOpen((v) => !v)}
+              type="button"
+            >
+              ⚙
+            </button>
+          ) : null}
+          {session && settingsOpen ? (
             <div className="absolute right-0 top-full z-30 mt-2 w-72 rounded-[1.2rem] border border-[#ebe3d7] bg-[#ffffff] p-5 shadow-[0_16px_40px_rgba(58,53,48,0.14)]">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-[10px] uppercase tracking-[0.3em] text-[#e89e7a]">
