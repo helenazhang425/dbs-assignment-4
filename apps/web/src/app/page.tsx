@@ -1,9 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { AppNav } from "@/components/app-nav";
 import { supabase } from "@/lib/supabase/client";
+import { isWeatherFresh, pageCache } from "@/lib/page-cache";
+import { usePreferences } from "@/lib/use-preferences";
+import { formatTemperature, type TempUnit } from "@/lib/preferences";
 import {
   fetchWeatherForCities,
   formatRunTime,
@@ -86,14 +89,27 @@ function scoreTier(score: number | null | undefined) {
 }
 
 export default function Home() {
-  const [session, setSession] = useState<Session | null>(null);
-  const [favoriteCities, setFavoriteCities] = useState<FavoriteCity[]>([]);
-  const [weatherByCity, setWeatherByCity] = useState<Record<string, CityWeather>>(
-    {},
+  const [session, setSession] = useState<Session | null>(pageCache.session);
+  const [favoriteCities, setFavoriteCities] = useState<FavoriteCity[]>(
+    pageCache.favorites,
   );
-  const [message, setMessage] = useState<string | null>(null);
+  const [weatherByCity, setWeatherByCity] = useState<Record<string, CityWeather>>(
+    pageCache.weather,
+  );
   const [error, setError] = useState<string | null>(null);
   const [loadingOverview, setLoadingOverview] = useState(false);
+
+  const [prefs] = usePreferences();
+
+  useEffect(() => {
+    pageCache.session = session;
+  }, [session]);
+  useEffect(() => {
+    pageCache.favorites = favoriteCities;
+  }, [favoriteCities]);
+  useEffect(() => {
+    pageCache.weather = weatherByCity;
+  }, [weatherByCity]);
 
   const displayedCities = session ? favoriteCities : demoCities;
 
@@ -110,22 +126,32 @@ export default function Home() {
     };
   }, []);
 
-  const loadOverviewWeather = useCallback(async (cities: FavoriteCity[]) => {
-    setLoadingOverview(true);
-
-    try {
-      const updates = await fetchWeatherForCities(cities);
-      setWeatherByCity(updates);
-    } catch (loadError) {
-      if (loadError instanceof Error) {
-        setError(loadError.message);
-      } else {
-        setError("Unable to load weather.");
+  const loadOverviewWeather = useCallback(
+    async (cities: FavoriteCity[], force = false) => {
+      if (!force && isWeatherFresh() && Object.keys(pageCache.weather).length) {
+        return;
       }
-    } finally {
-      setLoadingOverview(false);
-    }
-  }, []);
+      setLoadingOverview(true);
+
+      try {
+        const updates = await fetchWeatherForCities(cities, {
+          startHour: prefs.runStartHour,
+          endHour: prefs.runEndHour,
+        });
+        setWeatherByCity(updates);
+        pageCache.weatherFetchedAt = Date.now();
+      } catch (loadError) {
+        if (loadError instanceof Error) {
+          setError(loadError.message);
+        } else {
+          setError("Unable to load weather.");
+        }
+      } finally {
+        setLoadingOverview(false);
+      }
+    },
+    [prefs.runStartHour, prefs.runEndHour],
+  );
 
   const loadRealtimeWeather = useCallback(
     async (cities: FavoriteCity[]) => {
@@ -161,7 +187,10 @@ export default function Home() {
       const missing = cities.filter((city) => !latestByCity[city.id]);
       if (missing.length > 0) {
         try {
-          const fallback = await fetchWeatherForCities(missing);
+          const fallback = await fetchWeatherForCities(missing, {
+            startHour: prefs.runStartHour,
+            endHour: prefs.runEndHour,
+          });
           Object.assign(latestByCity, fallback);
         } catch {
           // partial data is fine
@@ -169,9 +198,10 @@ export default function Home() {
       }
 
       setWeatherByCity(latestByCity);
+      pageCache.weatherFetchedAt = Date.now();
       setLoadingOverview(false);
     },
-    [mapWeatherRow],
+    [mapWeatherRow, prefs.runStartHour, prefs.runEndHour],
   );
 
   const loadFavoriteCities = useCallback(async () => {
@@ -180,7 +210,7 @@ export default function Home() {
       .select(
         "id, city_name, country, admin1, latitude, longitude, timezone, created_at",
       )
-      .order("created_at", { ascending: true });
+      .order("city_name", { ascending: true });
 
     if (result.error) {
       setError(result.error.message);
@@ -219,7 +249,6 @@ export default function Home() {
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
       setError(null);
-      setMessage(nextSession ? "Welcome back." : null);
 
       if (nextSession) {
         void loadFavoriteCities();
@@ -287,6 +316,19 @@ export default function Home() {
 
     return () => window.clearInterval(intervalId);
   }, [displayedCities, loadOverviewWeather, session]);
+
+  const prefsHoursSignature = `${prefs.runStartHour}-${prefs.runEndHour}`;
+  const lastPrefsHours = useRef(prefsHoursSignature);
+  useEffect(() => {
+    if (lastPrefsHours.current === prefsHoursSignature) {
+      return;
+    }
+    lastPrefsHours.current = prefsHoursSignature;
+    const cities = session ? favoriteCities : demoCities;
+    if (cities.length > 0) {
+      void loadOverviewWeather(cities, true);
+    }
+  }, [prefsHoursSignature, session, favoriteCities, loadOverviewWeather]);
 
   const rankedCities = useMemo(() => {
     return displayedCities
@@ -382,19 +424,13 @@ export default function Home() {
         />
       </section>
 
-      {/* ── FLASH MESSAGES ─────────────────────────────────────────── */}
-      <div className="mx-auto max-w-6xl px-6">
-        {message ? (
-          <div className="mt-5 flex items-center gap-3 rounded-full border border-[#b8c9d9] bg-[#e6edf5] px-5 py-2 text-sm text-[#4a6382]">
-            <span aria-hidden>☀</span> {message}
-          </div>
-        ) : null}
-        {error ? (
+      {error ? (
+        <div className="mx-auto max-w-6xl px-6">
           <div className="mt-5 flex items-center gap-3 rounded-full border border-[#e89e7a] bg-[#f5e4de] px-5 py-2 text-sm text-[#8a4a3a]">
             <span aria-hidden>⚠</span> {error}
           </div>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       {/* ── STATS STRIP (3-up) ─────────────────────────────────────── */}
       <section className="mx-auto mt-10 grid max-w-6xl grid-cols-1 gap-3 px-6 md:grid-cols-3">
@@ -440,6 +476,7 @@ export default function Home() {
                   city={entry.city}
                   weather={entry.weather}
                   rank={index + 1}
+                  tempUnit={prefs.tempUnit}
                 />
               ))}
             </div>
@@ -453,6 +490,7 @@ export default function Home() {
                   city={entry.city}
                   weather={entry.weather}
                   rank={podium.length + index + 1}
+                  tempUnit={prefs.tempUnit}
                 />
               ))}
             </ol>
@@ -473,7 +511,7 @@ export default function Home() {
         </div>
 
         <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
-          <RunBriefCard topCity={topCity} session={session} />
+          <RunBriefCard topCity={topCity} session={session} tempUnit={prefs.tempUnit} />
           <LegendCard />
         </aside>
       </section>
@@ -508,44 +546,53 @@ function PodiumCard({
   city,
   weather,
   rank,
+  tempUnit,
 }: {
   city: FavoriteCity;
   weather: CityWeather | undefined;
   rank: number;
+  tempUnit: TempUnit;
 }) {
   const tier = scoreTier(weather?.bestRunScore);
+  const score = weather?.bestRunScore;
   const bg =
-    rank === 1
-      ? "bg-[linear-gradient(160deg,#4a6382_0%,#7895b3_100%)] text-[#faf6f0]"
-      : rank === 2
-        ? "bg-[linear-gradient(160deg,#3a3530_0%,#7a7369_100%)] text-[#faf6f0]"
-        : "bg-[linear-gradient(160deg,#e89e7a_0%,#f5c099_100%)] text-[#ffffff]";
+    score == null
+      ? "bg-[linear-gradient(160deg,#ebe3d7_0%,#d9cfc0_100%)] text-[#3a3530]"
+      : score >= 80
+        ? "bg-[linear-gradient(160deg,#4a6382_0%,#5d7896_100%)] text-[#faf6f0]"
+        : score >= 60
+          ? "bg-[linear-gradient(160deg,#7895b3_0%,#b8c9d9_100%)] text-[#faf6f0]"
+          : score >= 40
+            ? "bg-[linear-gradient(160deg,#b86b3c_0%,#d18858_100%)] text-[#faf6f0]"
+            : "bg-[linear-gradient(160deg,#7a7369_0%,#8a847d_100%)] text-[#faf6f0]";
   return (
     <article
-      className={`relative overflow-hidden rounded-[1.4rem] p-5 shadow-[0_10px_32px_rgba(74,99,130,0.14)] ${bg}`}
+      className={`relative flex h-full flex-col overflow-hidden rounded-[1.4rem] p-5 shadow-[0_10px_32px_rgba(74,99,130,0.14)] ${bg}`}
     >
       <div className="absolute right-3 top-3 text-[10px] uppercase tracking-[0.3em] opacity-80">
         #{rank}
       </div>
-      <div className="text-[10px] uppercase tracking-[0.28em] opacity-80">
+      <div className="line-clamp-1 text-[10px] uppercase tracking-[0.28em] opacity-80">
         {city.admin1 ?? city.country ?? "City"}
       </div>
-      <h3 className="mt-1 font-serif text-2xl leading-tight">{city.city_name}</h3>
+      <h3 className="mt-1 line-clamp-2 min-h-[3.5rem] font-serif text-2xl leading-tight">
+        {city.city_name}
+      </h3>
 
-      <div className="mt-5 flex items-end justify-between gap-4">
+      <div className="mt-5 flex items-start justify-between gap-4">
         <div>
           <div className="font-serif text-5xl leading-none">
-            {weather ? `${Math.round(weather.temperatureC)}°` : "—"}
+            {weather ? formatTemperature(weather.temperatureC, tempUnit, false) : "—"}
           </div>
           <div className="mt-1 text-xs opacity-80">
             {weatherLabel(weather?.weatherCode ?? null)}
           </div>
         </div>
         <div className="text-right">
-          <div className="text-[10px] uppercase tracking-[0.22em] opacity-80">
+          <div className="text-[10px] uppercase leading-none tracking-[0.22em] opacity-80">
             Best window
           </div>
-          <div className="mt-1 font-mono text-sm">
+          <div className="mt-2 font-mono text-sm">
             {weather?.bestRunTime
               ? formatRunTime(weather.bestRunTime, city.timezone)
               : "—"}
@@ -553,10 +600,11 @@ function PodiumCard({
         </div>
       </div>
 
-      <div
-        className={`mt-5 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-medium uppercase tracking-wider ${tier.tone}`}
-      >
-        {tier.label} · {weather?.bestRunScore ?? "—"}
+      <div className="mt-auto pt-8">
+        <div className="inline-flex items-center gap-2 rounded-full bg-[#faf6f0]/95 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-[#3a3530]">
+          <span className={`inline-block h-2 w-2 rounded-full ${tier.tone.split(" ")[0]}`} />
+          {tier.label} · {weather?.bestRunScore ?? "—"}
+        </div>
       </div>
     </article>
   );
@@ -566,10 +614,12 @@ function LeaderRow({
   city,
   weather,
   rank,
+  tempUnit,
 }: {
   city: FavoriteCity;
   weather: CityWeather | undefined;
   rank: number;
+  tempUnit: TempUnit;
 }) {
   const score = weather?.bestRunScore ?? 0;
   const tier = scoreTier(weather?.bestRunScore);
@@ -585,7 +635,7 @@ function LeaderRow({
       </div>
       <div>
         <div className="font-mono text-lg text-[#3a3530]">
-          {weather ? `${Math.round(weather.temperatureC)}°C` : "—"}
+          {weather ? formatTemperature(weather.temperatureC, tempUnit) : "—"}
         </div>
         <div className="text-xs text-[#8a847d]">
           {weatherLabel(weather?.weatherCode ?? null)}
@@ -638,11 +688,13 @@ function ScoreDial({ score }: { score: number | null }) {
 function RunBriefCard({
   topCity,
   session,
+  tempUnit,
 }: {
   topCity:
     | { city: FavoriteCity; weather: CityWeather | undefined }
     | null;
   session: Session | null;
+  tempUnit: TempUnit;
 }) {
   return (
     <div className="rounded-[1.4rem] border border-[#ebe3d7] bg-[linear-gradient(160deg,#4a6382_0%,#5d7896_100%)] p-6 text-[#faf6f0] shadow-[0_14px_30px_rgba(74,99,130,0.22)]">
@@ -660,7 +712,7 @@ function RunBriefCard({
       </h3>
       <p className="mt-3 text-sm leading-6 text-[#faf6f0]/85">
         {topCity
-          ? `${weatherLabel(topCity.weather?.weatherCode ?? null)}, ${Math.round(topCity.weather?.temperatureC ?? 0)}°C, rain chance ${topCity.weather?.precipitationProbability ?? 0}%. Score ${topCity.weather?.bestRunScore ?? "—"}/100.`
+          ? `${weatherLabel(topCity.weather?.weatherCode ?? null)}, ${formatTemperature(topCity.weather?.temperatureC, tempUnit)}, rain chance ${topCity.weather?.precipitationProbability ?? 0}%. Score ${topCity.weather?.bestRunScore ?? "—"}/100.`
           : session
             ? "Your brief fills in once you've added cities on the My cities page."
             : "Sign in to track your own cities."}
