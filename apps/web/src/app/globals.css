@@ -1,14 +1,27 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fff7eb;
-  --foreground: #1c1917;
+  --background: #faf6f0;
+  --foreground: #3a3530;
+  --sky-deep: #4a6382;
+  --sky: #7895b3;
+  --sky-light: #b8c9d9;
+  --coral: #e89e7a;
+  --coral-light: #f5c099;
+  --amber-soft: #e8b96e;
+  --cloud: #ffffff;
+  --mist: #faf6f0;
+  --border-mist: #ebe3d7;
+  --slate-ink: #3a3530;
+  --slate-body: #55504a;
+  --slate-muted: #8a847d;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-sans: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-serif: "Fraunces", "Iowan Old Style", "Georgia", serif;
   --font-mono: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono",
     Menlo, monospace;
 }
@@ -22,7 +35,10 @@ html {
 }
 
 body {
-  background: var(--background);
+  background:
+    radial-gradient(ellipse 80% 50% at 10% 0%, rgba(184, 201, 217, 0.24), transparent 60%),
+    radial-gradient(ellipse 70% 60% at 100% 100%, rgba(232, 158, 122, 0.10), transparent 60%),
+    var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
 }
@@ -38,5 +54,10 @@ input {
 }
 
 ::selection {
-  background: rgba(245, 158, 11, 0.28);
+  background: rgba(232, 158, 122, 0.25);
+}
+
+.font-serif {
+  font-family: var(--font-serif);
+  font-feature-settings: "ss01", "ss02";
 }
