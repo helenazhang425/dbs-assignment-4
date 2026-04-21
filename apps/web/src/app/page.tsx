@@ -202,21 +202,17 @@ export default function Home() {
 
       try {
         await loadCachedWeather(cities);
-        const missingCities = cities.filter((city) => !pageCache.weather[city.id]);
+        const refreshedUpdates = await fetchWeatherForCities(cities, {
+          startHour: prefs.runStartHour,
+          endHour: prefs.runEndHour,
+        });
 
-        if (missingCities.length > 0) {
-          const fallbackUpdates = await fetchWeatherForCities(missingCities, {
-            startHour: prefs.runStartHour,
-            endHour: prefs.runEndHour,
-          });
-
-          setWeatherByCity((current) => {
-            const nextWeather = { ...current, ...fallbackUpdates };
-            pageCache.weather = nextWeather;
-            return nextWeather;
-          });
-          pageCache.weatherFetchedAt = Date.now();
-        }
+        setWeatherByCity((current) => {
+          const nextWeather = { ...current, ...refreshedUpdates };
+          pageCache.weather = nextWeather;
+          return nextWeather;
+        });
+        pageCache.weatherFetchedAt = Date.now();
         setError(null);
       } catch (loadError) {
         if (loadError instanceof Error) {
