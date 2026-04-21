@@ -215,7 +215,6 @@ export async function fetchWeatherForCities(
         return null;
       }
 
-      const currentHour = parseHour(data.current.time);
       const currentDate = parseLocalDate(data.current.time);
       let bestRunTime: string | null = null;
       let bestRunScore = -1;
@@ -229,13 +228,10 @@ export async function fetchWeatherForCities(
         const candidateTime = data.hourly.time[index];
         const hour = parseHour(candidateTime);
         const candidateDate = parseLocalDate(candidateTime);
-        if (hour == null || currentHour == null || currentDate == null) {
+        if (hour == null || currentDate == null) {
           continue;
         }
         if (candidateDate !== currentDate) {
-          continue;
-        }
-        if (hour < currentHour) {
           continue;
         }
         if (hour < startHour || hour > endHour) {
