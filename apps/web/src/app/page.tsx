@@ -128,47 +128,6 @@ export default function Home() {
     };
   }, []);
 
-  const loadCachedWeather = useCallback(
-    async (cities: FavoriteCity[], options: { hydrate?: boolean } = {}) => {
-      const hydrate = options.hydrate ?? true;
-      if (cities.length === 0) {
-        setWeatherByCity({});
-        pageCache.weather = {};
-        pageCache.weatherFetchedAt = Date.now();
-        return;
-      }
-
-      const result = await supabase
-        .from("weather_updates")
-        .select(
-          "city_id, source_timestamp, temperature_c, apparent_temperature_c, wind_speed_kph, weather_code, best_run_time, best_run_score, precipitation_probability",
-        )
-        .in(
-          "city_id",
-          cities.map((city) => city.id),
-        )
-        .order("source_timestamp", { ascending: false });
-
-      if (result.error) {
-        throw result.error;
-      }
-
-      const latestByCity: Record<string, CityWeather> = {};
-      for (const row of (result.data ?? []) as WeatherUpdateRow[]) {
-        if (!latestByCity[row.city_id]) {
-          latestByCity[row.city_id] = mapWeatherRow(row);
-        }
-      }
-
-      if (hydrate) {
-        setWeatherByCity(latestByCity);
-      }
-      pageCache.weather = latestByCity;
-      pageCache.weatherFetchedAt = Date.now();
-    },
-    [mapWeatherRow],
-  );
-
   const loadOverviewWeather = useCallback(
     async (cities: FavoriteCity[], force = false) => {
       const requestId = ++weatherRequestId.current;
@@ -214,9 +173,6 @@ export default function Home() {
       setLoadingOverview(true);
 
       try {
-        await loadCachedWeather(cities, {
-          hydrate: Object.keys(pageCache.weather).length === 0,
-        });
         const refreshedUpdates = await fetchWeatherForCities(cities, {
           startHour: prefs.runStartHour,
           endHour: prefs.runEndHour,
@@ -244,7 +200,7 @@ export default function Home() {
         setLoadingOverview(false);
       }
     },
-    [loadCachedWeather, prefs.runEndHour, prefs.runStartHour],
+    [prefs.runEndHour, prefs.runStartHour],
   );
 
   const loadFavoriteCities = useCallback(async () => {
