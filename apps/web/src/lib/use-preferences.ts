@@ -6,6 +6,7 @@ import {
   loadPreferences,
   PREFS_EVENT,
   savePreferences,
+  syncPreferencesToUrl,
   type Preferences,
 } from "./preferences";
 
@@ -31,6 +32,7 @@ export function usePreferences() {
           ? (updater as (p: Preferences) => Preferences)(current)
           : updater;
       savePreferences(next);
+      syncPreferencesToUrl(next);
       setPrefs(next);
       window.dispatchEvent(new CustomEvent(PREFS_EVENT));
     },
