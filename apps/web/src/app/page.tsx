@@ -213,10 +213,9 @@ export default function Home() {
           endHour: prefs.runEndHour,
         });
 
-        setWeatherByCity((current) => {
-          const nextWeather = { ...current, ...refreshedUpdates };
-          pageCache.weather = nextWeather;
-          return nextWeather;
+        setWeatherByCity(() => {
+          pageCache.weather = refreshedUpdates;
+          return refreshedUpdates;
         });
         pageCache.weatherFetchedAt = Date.now();
         setError(null);
