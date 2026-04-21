@@ -127,7 +127,8 @@ export default function Home() {
   }, []);
 
   const loadCachedWeather = useCallback(
-    async (cities: FavoriteCity[]) => {
+    async (cities: FavoriteCity[], options: { hydrate?: boolean } = {}) => {
+      const hydrate = options.hydrate ?? true;
       if (cities.length === 0) {
         setWeatherByCity({});
         pageCache.weather = {};
@@ -157,7 +158,9 @@ export default function Home() {
         }
       }
 
-      setWeatherByCity(latestByCity);
+      if (hydrate) {
+        setWeatherByCity(latestByCity);
+      }
       pageCache.weather = latestByCity;
       pageCache.weatherFetchedAt = Date.now();
     },
@@ -201,7 +204,9 @@ export default function Home() {
       setLoadingOverview(true);
 
       try {
-        await loadCachedWeather(cities);
+        await loadCachedWeather(cities, {
+          hydrate: Object.keys(pageCache.weather).length === 0,
+        });
         const refreshedUpdates = await fetchWeatherForCities(cities, {
           startHour: prefs.runStartHour,
           endHour: prefs.runEndHour,
