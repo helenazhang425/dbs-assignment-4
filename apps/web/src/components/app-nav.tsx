@@ -160,31 +160,44 @@ export function AppNav({ session }: AppNavProps) {
                 <div className="text-[11px] uppercase tracking-wider text-[#8a847d]">
                   Run window
                 </div>
-                <div className="mt-2 flex items-center gap-2">
-                  <HourSelect
-                    value={prefs.runStartHour}
-                    onChange={(hour) =>
-                      updatePrefs((current) => ({
-                        ...current,
-                        runStartHour: hour,
-                        runEndHour: Math.max(current.runEndHour, hour + 1),
-                      }))
-                    }
-                  />
-                  <span className="text-xs text-[#8a847d]">to</span>
-                  <HourSelect
-                    value={prefs.runEndHour}
-                    onChange={(hour) =>
-                      updatePrefs((current) => ({
-                        ...current,
-                        runEndHour: hour,
-                        runStartHour: Math.min(current.runStartHour, hour - 1),
-                      }))
-                    }
-                  />
+                <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-end gap-2">
+                  <div>
+                    <div className="mb-1 text-[10px] uppercase tracking-[0.18em] text-[#8a847d]">
+                      Start
+                    </div>
+                    <HourSelect
+                      value={prefs.runStartHour}
+                      onChange={(hour) =>
+                        updatePrefs((current) => ({
+                          ...current,
+                          runStartHour: hour,
+                          runEndHour: Math.max(current.runEndHour, hour + 1),
+                        }))
+                      }
+                    />
+                  </div>
+                  <span className="pb-2 text-xs text-[#8a847d]">to</span>
+                  <div>
+                    <div className="mb-1 text-[10px] uppercase tracking-[0.18em] text-[#8a847d]">
+                      End
+                    </div>
+                    <HourSelect
+                      value={prefs.runEndHour}
+                      onChange={(hour) =>
+                        updatePrefs((current) => ({
+                          ...current,
+                          runEndHour: hour,
+                          runStartHour: Math.min(current.runStartHour, hour - 1),
+                        }))
+                      }
+                    />
+                  </div>
                 </div>
                 <p className="mt-2 text-[11px] text-[#8a847d]">
-                  Best-window picks stay within this range.
+                  Best-window picks stay within this start-to-end range in each city&apos;s local time.
+                </p>
+                <p className="mt-1 text-[11px] text-[#8a847d]">
+                  Current window: {formatHour(prefs.runStartHour)} to {formatHour(prefs.runEndHour)}.
                 </p>
               </div>
             </div>

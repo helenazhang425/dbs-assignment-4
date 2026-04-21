@@ -101,6 +101,7 @@ export default function Home() {
   const [loadingOverview, setLoadingOverview] = useState(false);
 
   const [prefs] = usePreferences();
+  const weatherRequestId = useRef(0);
 
   useEffect(() => {
     pageCache.session = session;
@@ -170,6 +171,7 @@ export default function Home() {
 
   const loadOverviewWeather = useCallback(
     async (cities: FavoriteCity[], force = false) => {
+      const requestId = ++weatherRequestId.current;
       const cacheCoversAll = cities.every((c) => pageCache.weather[c.id]);
       if (!force && isWeatherFresh() && cacheCoversAll) {
         return;
@@ -181,9 +183,15 @@ export default function Home() {
           startHour: prefs.runStartHour,
           endHour: prefs.runEndHour,
         });
+        if (requestId !== weatherRequestId.current) {
+          return;
+        }
         setWeatherByCity(updates);
         pageCache.weatherFetchedAt = Date.now();
       } catch (loadError) {
+        if (requestId !== weatherRequestId.current) {
+          return;
+        }
         if (loadError instanceof Error) {
           setError(loadError.message);
         } else {
@@ -198,6 +206,7 @@ export default function Home() {
 
   const loadRealtimeWeather = useCallback(
     async (cities: FavoriteCity[]) => {
+      const requestId = ++weatherRequestId.current;
       if (cities.length === 0) {
         setWeatherByCity({});
         return;
@@ -212,6 +221,9 @@ export default function Home() {
           startHour: prefs.runStartHour,
           endHour: prefs.runEndHour,
         });
+        if (requestId !== weatherRequestId.current) {
+          return;
+        }
 
         setWeatherByCity(() => {
           pageCache.weather = refreshedUpdates;
@@ -220,6 +232,9 @@ export default function Home() {
         pageCache.weatherFetchedAt = Date.now();
         setError(null);
       } catch (loadError) {
+        if (requestId !== weatherRequestId.current) {
+          return;
+        }
         if (loadError instanceof Error) {
           setError(loadError.message);
         } else {
