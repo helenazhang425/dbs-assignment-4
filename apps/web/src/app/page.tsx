@@ -9,6 +9,7 @@ import { usePreferences } from "@/lib/use-preferences";
 import { formatTemperature, type TempUnit } from "@/lib/preferences";
 import {
   fetchWeatherForCities,
+  formatRunDate,
   formatRunTime,
   type CityWeather,
   type FavoriteCity,
@@ -451,6 +452,11 @@ export default function Home() {
                 ? ` · ${weatherLabel(topCity.weather.weatherCode)}`
                 : ""}
             </div>
+            <div className="mt-1 text-[11px] uppercase tracking-[0.22em] text-[#faf6f0]/65">
+              {topCity?.weather?.currentTime
+                ? `Today · ${formatRunDate(topCity.weather.currentTime, topCity.city.timezone)} · local city time`
+                : "Today · local city time"}
+            </div>
             <div className="mt-5 flex items-center gap-3">
               <ScoreDial score={topCity?.weather?.bestRunScore ?? null} />
               <div className="text-xs leading-5 text-[#faf6f0]/75">
@@ -660,6 +666,11 @@ function PodiumCard({
               ? formatRunTime(weather.bestRunTime, city.timezone)
               : "—"}
           </div>
+          <div className="mt-1 text-[10px] uppercase tracking-[0.18em] opacity-70">
+            {weather?.currentTime
+              ? `Today · ${formatRunDate(weather.currentTime, city.timezone)}`
+              : "Today"}
+          </div>
         </div>
       </div>
 
@@ -712,6 +723,11 @@ function LeaderRow({
           {weather?.bestRunTime
             ? formatRunTime(weather.bestRunTime, city.timezone)
             : "—"}
+        </div>
+        <div className="text-[10px] uppercase tracking-[0.18em] text-[#8a847d]">
+          {weather?.currentTime
+            ? `Today · ${formatRunDate(weather.currentTime, city.timezone)}`
+            : "Today"}
         </div>
       </div>
       <div className="w-28">
@@ -779,6 +795,11 @@ function RunBriefCard({
           : session
             ? "Your brief fills in once you've added cities on the My cities page."
             : "Sign in to track your own cities."}
+      </p>
+      <p className="mt-3 text-[11px] uppercase tracking-[0.18em] text-[#faf6f0]/65">
+        {topCity?.weather?.currentTime
+          ? `Today in ${topCity.city.city_name} · ${formatRunDate(topCity.weather.currentTime, topCity.city.timezone)} · local city time`
+          : "Today · local city time"}
       </p>
     </div>
   );

@@ -85,6 +85,11 @@ function parseHour(value: string) {
   return Number.isNaN(hour) ? null : hour;
 }
 
+function parseLocalDate(value: string) {
+  const date = value.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null;
+}
+
 function hasExplicitTimezone(value: string) {
   return /(?:Z|[+-]\d{2}:\d{2})$/.test(value);
 }
@@ -93,6 +98,26 @@ function formatHourMinute(hour: number, minute: number) {
   const period = hour < 12 ? "AM" : "PM";
   const hr12 = hour % 12 === 0 ? 12 : hour % 12;
   return `${hr12}:${minute.toString().padStart(2, "0")} ${period}`;
+}
+
+export function formatRunDate(value: string | null, timezone: string) {
+  if (!value) return "Today";
+
+  if (!hasExplicitTimezone(value)) {
+    const date = parseLocalDate(value);
+    if (!date) return "Today";
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    }).format(new Date(`${date}T00:00:00Z`));
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: timezone,
+  }).format(new Date(value));
 }
 
 export function formatRunTime(value: string | null, timezone: string) {
@@ -191,6 +216,7 @@ export async function fetchWeatherForCities(
       }
 
       const currentHour = parseHour(data.current.time);
+      const currentDate = parseLocalDate(data.current.time);
       let bestRunTime: string | null = null;
       let bestRunScore = -1;
       let bestPrecipitation: number | null = null;
@@ -202,10 +228,14 @@ export async function fetchWeatherForCities(
       ) {
         const candidateTime = data.hourly.time[index];
         const hour = parseHour(candidateTime);
-        if (hour == null || currentHour == null) {
+        const candidateDate = parseLocalDate(candidateTime);
+        if (hour == null || currentHour == null || currentDate == null) {
           continue;
         }
-        if (hour < currentHour && index < 2) {
+        if (candidateDate !== currentDate) {
+          continue;
+        }
+        if (hour < currentHour) {
           continue;
         }
         if (hour < startHour || hour > endHour) {
