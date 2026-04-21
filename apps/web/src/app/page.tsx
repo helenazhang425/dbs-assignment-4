@@ -6,7 +6,11 @@ import { AppNav } from "@/components/app-nav";
 import { supabase } from "@/lib/supabase/client";
 import { isWeatherFresh, pageCache } from "@/lib/page-cache";
 import { usePreferences } from "@/lib/use-preferences";
-import { formatTemperature, type TempUnit } from "@/lib/preferences";
+import {
+  DEFAULT_PREFERENCES,
+  formatTemperature,
+  type TempUnit,
+} from "@/lib/preferences";
 import {
   fetchWeatherForCities,
   formatRunDate,
@@ -102,6 +106,7 @@ export default function Home() {
 
   const [prefs] = usePreferences();
   const weatherRequestId = useRef(0);
+  const activePrefs = session ? prefs : DEFAULT_PREFERENCES;
 
   useEffect(() => {
     pageCache.session = session;
@@ -139,8 +144,8 @@ export default function Home() {
 
       try {
         const updates = await fetchWeatherForCities(cities, {
-          startHour: prefs.runStartHour,
-          endHour: prefs.runEndHour,
+          startHour: activePrefs.runStartHour,
+          endHour: activePrefs.runEndHour,
         });
         if (requestId !== weatherRequestId.current) {
           return;
@@ -160,7 +165,7 @@ export default function Home() {
         setLoadingOverview(false);
       }
     },
-    [prefs.runStartHour, prefs.runEndHour],
+    [activePrefs.runEndHour, activePrefs.runStartHour],
   );
 
   const loadRealtimeWeather = useCallback(
@@ -174,8 +179,8 @@ export default function Home() {
 
       try {
         const refreshedUpdates = await fetchWeatherForCities(cities, {
-          startHour: prefs.runStartHour,
-          endHour: prefs.runEndHour,
+          startHour: activePrefs.runStartHour,
+          endHour: activePrefs.runEndHour,
         });
         if (requestId !== weatherRequestId.current) {
           return;
@@ -200,7 +205,7 @@ export default function Home() {
         setLoadingOverview(false);
       }
     },
-    [prefs.runEndHour, prefs.runStartHour],
+    [activePrefs.runEndHour, activePrefs.runStartHour],
   );
 
   const loadFavoriteCities = useCallback(async () => {
@@ -328,7 +333,7 @@ export default function Home() {
     return () => window.clearInterval(intervalId);
   }, [displayedCities, loadOverviewWeather, session]);
 
-  const prefsHoursSignature = `${prefs.runStartHour}-${prefs.runEndHour}`;
+  const prefsHoursSignature = `${activePrefs.runStartHour}-${activePrefs.runEndHour}`;
   const lastPrefsHours = useRef(prefsHoursSignature);
   useEffect(() => {
     if (lastPrefsHours.current === prefsHoursSignature) {
@@ -513,7 +518,7 @@ export default function Home() {
                   city={entry.city}
                   weather={entry.weather}
                   rank={index + 1}
-                  tempUnit={prefs.tempUnit}
+                  tempUnit={activePrefs.tempUnit}
                 />
               ))}
             </div>
@@ -527,7 +532,7 @@ export default function Home() {
                   city={entry.city}
                   weather={entry.weather}
                   rank={podium.length + index + 1}
-                  tempUnit={prefs.tempUnit}
+                  tempUnit={activePrefs.tempUnit}
                 />
               ))}
             </ol>
@@ -548,7 +553,7 @@ export default function Home() {
         </div>
 
         <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
-          <RunBriefCard topCity={topCity} session={session} tempUnit={prefs.tempUnit} />
+          <RunBriefCard topCity={topCity} session={session} tempUnit={activePrefs.tempUnit} />
           <LegendCard />
         </aside>
       </section>
