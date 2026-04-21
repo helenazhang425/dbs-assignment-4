@@ -37,12 +37,35 @@ function computeRunScore({
 }
 
 async function fetchForecast(city) {
-  const response = await fetch(
-    `https://api.open-meteo.com/v1/forecast?latitude=${city.latitude}&longitude=${city.longitude}&current=temperature_2m,apparent_temperature,wind_speed_10m,weather_code&hourly=temperature_2m,apparent_temperature,precipitation_probability,wind_speed_10m&forecast_days=2&timezone=${encodeURIComponent(city.timezone)}`,
+  const params = new URLSearchParams({
+    latitude: String(city.latitude),
+    longitude: String(city.longitude),
+    current:
+      "temperature_2m,apparent_temperature,wind_speed_10m,weather_code",
+    hourly:
+      "temperature_2m,apparent_temperature,precipitation_probability,wind_speed_10m",
+    forecast_days: "2",
+    timezone: city.timezone,
+  });
+
+  let response = await fetch(
+    `https://api.open-meteo.com/v1/forecast?${params.toString()}`,
   );
 
+  if (!response.ok && city.timezone !== "auto") {
+    params.set("timezone", "auto");
+    response = await fetch(
+      `https://api.open-meteo.com/v1/forecast?${params.toString()}`,
+    );
+  }
+
   if (!response.ok) {
-    throw new Error(`Open-Meteo request failed for ${city.city_name}`);
+    console.error("Open-Meteo request failed", {
+      city: city.city_name,
+      timezone: city.timezone,
+      status: response.status,
+    });
+    return null;
   }
 
   const data = await response.json();
@@ -106,7 +129,11 @@ async function main() {
     return;
   }
 
-  const updates = await Promise.all(cities.map(fetchForecast));
+  const updates = (await Promise.all(cities.map(fetchForecast))).filter(Boolean);
+
+  if (updates.length === 0) {
+    throw new Error("All weather fetches failed.");
+  }
 
   const { error: insertError } = await supabase
     .from("weather_updates")
