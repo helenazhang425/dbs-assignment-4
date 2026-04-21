@@ -80,17 +80,38 @@ export function computeRunScore(input: {
   );
 }
 
-export function formatRunTime(value: string | null, _timezone: string) {
+function parseHour(value: string) {
+  const hour = Number.parseInt(value.slice(11, 13), 10);
+  return Number.isNaN(hour) ? null : hour;
+}
+
+function hasExplicitTimezone(value: string) {
+  return /(?:Z|[+-]\d{2}:\d{2})$/.test(value);
+}
+
+function formatHourMinute(hour: number, minute: number) {
+  const period = hour < 12 ? "AM" : "PM";
+  const hr12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${hr12}:${minute.toString().padStart(2, "0")} ${period}`;
+}
+
+export function formatRunTime(value: string | null, timezone: string) {
   if (!value) return "No clear window";
 
-  // Open-Meteo returns times already in the city's local zone without a tz
-  // suffix, which JS parses as the browser's local time. `getHours()` on that
-  // Date preserves the hour component from the string, so reading local parts
-  // here correctly shows the city-local hour regardless of where the viewer is.
-  return new Date(value).toLocaleTimeString("en-US", {
+  if (!hasExplicitTimezone(value)) {
+    const hour = parseHour(value);
+    const minute = Number.parseInt(value.slice(14, 16), 10);
+    if (hour == null || Number.isNaN(minute)) {
+      return "No clear window";
+    }
+    return formatHourMinute(hour, minute);
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",
-  });
+    timeZone: timezone,
+  }).format(new Date(value));
 }
 
 export function isFavoriteCity(
@@ -169,7 +190,7 @@ export async function fetchWeatherForCities(
         return null;
       }
 
-      const currentHour = new Date(data.current.time).getHours();
+      const currentHour = parseHour(data.current.time);
       let bestRunTime: string | null = null;
       let bestRunScore = -1;
       let bestPrecipitation: number | null = null;
@@ -180,7 +201,10 @@ export async function fetchWeatherForCities(
         index += 1
       ) {
         const candidateTime = data.hourly.time[index];
-        const hour = new Date(candidateTime).getHours();
+        const hour = parseHour(candidateTime);
+        if (hour == null || currentHour == null) {
+          continue;
+        }
         if (hour < currentHour && index < 2) {
           continue;
         }
