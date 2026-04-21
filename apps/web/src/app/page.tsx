@@ -508,9 +508,20 @@ export default function Home() {
                 Ranked by run window
               </h2>
             </div>
-            {loadingOverview ? (
-              <span className="text-xs text-[#8a847d]">Refreshing…</span>
-            ) : null}
+            <span
+              aria-live="polite"
+              className="flex h-5 items-center"
+            >
+              {loadingOverview ? (
+                <>
+                  <span className="sr-only">Refreshing run windows</span>
+                  <span
+                    aria-hidden
+                    className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#8a847d]/55"
+                  />
+                </>
+              ) : null}
+            </span>
           </div>
 
           {hasCities && podium.length > 0 ? (
