@@ -126,6 +126,44 @@ export default function Home() {
     };
   }, []);
 
+  const loadCachedWeather = useCallback(
+    async (cities: FavoriteCity[]) => {
+      if (cities.length === 0) {
+        setWeatherByCity({});
+        pageCache.weather = {};
+        pageCache.weatherFetchedAt = Date.now();
+        return;
+      }
+
+      const result = await supabase
+        .from("weather_updates")
+        .select(
+          "city_id, source_timestamp, temperature_c, apparent_temperature_c, wind_speed_kph, weather_code, best_run_time, best_run_score, precipitation_probability",
+        )
+        .in(
+          "city_id",
+          cities.map((city) => city.id),
+        )
+        .order("source_timestamp", { ascending: false });
+
+      if (result.error) {
+        throw result.error;
+      }
+
+      const latestByCity: Record<string, CityWeather> = {};
+      for (const row of (result.data ?? []) as WeatherUpdateRow[]) {
+        if (!latestByCity[row.city_id]) {
+          latestByCity[row.city_id] = mapWeatherRow(row);
+        }
+      }
+
+      setWeatherByCity(latestByCity);
+      pageCache.weather = latestByCity;
+      pageCache.weatherFetchedAt = Date.now();
+    },
+    [mapWeatherRow],
+  );
+
   const loadOverviewWeather = useCallback(
     async (cities: FavoriteCity[], force = false) => {
       const cacheCoversAll = cities.every((c) => pageCache.weather[c.id]);
@@ -160,12 +198,26 @@ export default function Home() {
         setWeatherByCity({});
         return;
       }
-      // Frontend is the source of truth for best-run time so it respects the
-      // user's run window preference; Supabase realtime still streams live
-      // updates to current temp / weather_code.
-      await loadOverviewWeather(cities, true);
+      setLoadingOverview(true);
+
+      try {
+        await loadCachedWeather(cities);
+        if (cities.some((city) => !pageCache.weather[city.id])) {
+          setError(
+            "Weather is still syncing for some cities. The worker should fill this in shortly.",
+          );
+        }
+      } catch (loadError) {
+        if (loadError instanceof Error) {
+          setError(loadError.message);
+        } else {
+          setError("Unable to load weather.");
+        }
+      } finally {
+        setLoadingOverview(false);
+      }
     },
-    [loadOverviewWeather],
+    [loadCachedWeather],
   );
 
   const loadFavoriteCities = useCallback(async () => {
@@ -302,9 +354,19 @@ export default function Home() {
     lastPrefsHours.current = prefsHoursSignature;
     const cities = session ? favoriteCities : demoCities;
     if (cities.length > 0) {
-      void loadOverviewWeather(cities, true);
+      if (session) {
+        void loadRealtimeWeather(cities);
+      } else {
+        void loadOverviewWeather(cities, true);
+      }
     }
-  }, [prefsHoursSignature, session, favoriteCities, loadOverviewWeather]);
+  }, [
+    favoriteCities,
+    loadOverviewWeather,
+    loadRealtimeWeather,
+    prefsHoursSignature,
+    session,
+  ]);
 
   const rankedCities = useMemo(() => {
     return displayedCities
