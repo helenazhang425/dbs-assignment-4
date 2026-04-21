@@ -202,11 +202,22 @@ export default function Home() {
 
       try {
         await loadCachedWeather(cities);
-        if (cities.some((city) => !pageCache.weather[city.id])) {
-          setError(
-            "Weather is still syncing for some cities. The worker should fill this in shortly.",
-          );
+        const missingCities = cities.filter((city) => !pageCache.weather[city.id]);
+
+        if (missingCities.length > 0) {
+          const fallbackUpdates = await fetchWeatherForCities(missingCities, {
+            startHour: prefs.runStartHour,
+            endHour: prefs.runEndHour,
+          });
+
+          setWeatherByCity((current) => {
+            const nextWeather = { ...current, ...fallbackUpdates };
+            pageCache.weather = nextWeather;
+            return nextWeather;
+          });
+          pageCache.weatherFetchedAt = Date.now();
         }
+        setError(null);
       } catch (loadError) {
         if (loadError instanceof Error) {
           setError(loadError.message);
@@ -217,7 +228,7 @@ export default function Home() {
         setLoadingOverview(false);
       }
     },
-    [loadCachedWeather],
+    [loadCachedWeather, prefs.runEndHour, prefs.runStartHour],
   );
 
   const loadFavoriteCities = useCallback(async () => {
