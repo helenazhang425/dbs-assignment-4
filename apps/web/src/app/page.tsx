@@ -645,9 +645,10 @@ function PodiumCard({
       </div>
 
       <div className="mt-auto pt-8">
-        <div className="inline-flex items-center gap-2 rounded-full bg-[#faf6f0]/95 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-[#3a3530]">
-          <span className={`inline-block h-2 w-2 rounded-full ${tier.tone.split(" ")[0]}`} />
-          {tier.label} · {weather?.bestRunScore ?? "—"}
+        <div className="inline-flex items-center gap-2 rounded-full border border-[#3a3530]/10 bg-[#faf6f0] px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-[#3a3530] shadow-sm">
+          <span className={`inline-block h-2.5 w-2.5 rounded-full ${tier.tone.split(" ")[0]}`} />
+          <span>{tier.label}</span>
+          <span className="font-mono text-[12px]">{weather?.bestRunScore ?? "—"}</span>
         </div>
       </div>
     </article>
